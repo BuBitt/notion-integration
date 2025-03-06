@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import glob
 import json
@@ -110,9 +111,9 @@ def clean_old_logs(max_age_days=7):
 
 
 # Carregar caches
-page_cache = check_and_update_cache(PAGE_CACHE_FILE, "page_cache", max_age_days=1)
+page_cache = check_and_update_cache(PAGE_CACHE_FILE, "page_cache", max_age_days=3)
 materia_cache = check_and_update_cache(
-    MATERIA_CACHE_FILE, "materia_cache", max_age_days=1
+    MATERIA_CACHE_FILE, "materia_cache", max_age_days=3
 )
 last_message_info = load_cache(
     LAST_MESSAGE_FILE, "last_message"
@@ -120,10 +121,11 @@ last_message_info = load_cache(
 
 # Carregar variáveis de ambiente
 load_dotenv()
-notion_api_key = os.getenv("NOTION_API_KEY")
-notion_database_id = os.getenv("NOTION_DATABASE_ID")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID_WPP = os.getenv("TELEGRAM_CHAT_ID_WPP")
 
 
 # Funções existentes do Notion (mantidas iguais)
@@ -150,18 +152,18 @@ def check_notion_api(api_key, database_id):
 
 
 logger.info("Iniciando programa e checando API do Notion...")
-if not notion_api_key or not notion_database_id:
+if not NOTION_API_KEY or not NOTION_DATABASE_ID:
     logger.error(
         "As variáveis de ambiente 'NOTION_API_KEY' e 'NOTION_DATABASE_ID' não estão definidas!"
     )
     raise ValueError("Variáveis de ambiente não definidas!")
-if not check_notion_api(notion_api_key, notion_database_id):
+if not check_notion_api(NOTION_API_KEY, NOTION_DATABASE_ID):
     logger.error("Checagem da API falhou. Encerrando programa.")
     raise SystemExit("Erro na API do Notion")
 
 logger.info("Variáveis de ambiente carregadas e API validada com sucesso!")
 headers = {
-    "Authorization": f"Bearer {notion_api_key}",
+    "Authorization": f"Bearer {NOTION_API_KEY}",
     "Notion-Version": "2022-06-28",
     "Content-Type": "application/json",
 }
@@ -300,7 +302,7 @@ def fetch_notion_data(database_id, headers, page_size=100):
 
 # Processamento principal
 logger.info("Iniciando requisição ao Notion...")
-results = fetch_notion_data(notion_database_id, headers)
+results = fetch_notion_data(NOTION_DATABASE_ID, headers)
 logger.info("Dados obtidos com sucesso! Processando...")
 
 batch_size = 50
@@ -334,6 +336,27 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
 def formatar_data(data_str):
     data = datetime.strptime(data_str, "%Y-%m-%d")
     return data.strftime("%d/%m")
+
+
+def formatar_data(data_str):
+    meses = {
+        1: "Janeiro",
+        2: "Fevereiro",
+        3: "Março",
+        4: "Abril",
+        5: "Maio",
+        6: "Junho",
+        7: "Julho",
+        8: "Agosto",
+        9: "Setembro",
+        10: "Outubro",
+        11: "Novembro",
+        12: "Dezembro",
+    }
+    data = datetime.strptime(data_str, "%Y-%m-%d")
+    dia = data.day
+    mes = meses[data.month]
+    return f"{dia} de {mes}"
 
 
 def escapar_markdown_v2(texto):
@@ -374,7 +397,7 @@ def gerar_mensagem_tarefa(tarefa):
     data_formatada = formatar_data(entrega) if entrega != "N/D" else "N/D"
     tipo = escapar_markdown_v2(tipo)
     materia = escapar_markdown_v2(materia)
-    data_formatada = escapar_markdown_v2(data_formatada)
+    data_formatada = formatar_data(entrega) if entrega != "N/D" else "N/D"
     descricao = escapar_markdown_v2(descricao)
     topicos = tarefa.get("Tópicos") or "Sem Tópicos"
 
@@ -416,24 +439,23 @@ def delete_previous_message(chat_id, message_id):
         logger.error(f"Erro de conexão ao tentar apagar mensagem: {e}")
 
 
-# Função ajustada para enviar mensagem ao Telegram
-def enviar_mensagem_telegram(mensagem):
+# Função para enviar mensagem ao Telegram
+def enviar_mensagem_telegram(mensagem, t_chat_id=TELEGRAM_CHAT_ID, parse_mode=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": t_chat_id,
         "text": mensagem,
-        "parse_mode": "MarkdownV2",
     }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            message_data = response.json()
-            message_id = message_data["result"]["message_id"]
             logger.info("Mensagem enviada ao Telegram com sucesso!")
-            return message_id  # Retorna o ID da mensagem enviada
+            return response.json()["result"]["message_id"]
         else:
             logger.error(
-                f"Erro ao enviar mensagem ao Telegram: {response.status_code} - {response.text}"
+                f"Erro ao enviar mensagem: {response.status_code} - {response.text}"
             )
             return None
     except requests.RequestException as e:
@@ -460,9 +482,27 @@ if mensagens_validas:
         delete_previous_message(TELEGRAM_CHAT_ID, last_message_info["message_id"])
 
     # Enviar nova mensagem e salvar o message_id
-    message_id = enviar_mensagem_telegram(mensagem_conjunta)
+    message_id = enviar_mensagem_telegram(
+        mensagem=mensagem_conjunta, parse_mode="MarkdownV2"
+    )
     if message_id:
         last_message_info = {"message_id": message_id, "date": current_date}
         save_cache(last_message_info, LAST_MESSAGE_FILE, "last_message")
 else:
     logger.info("Nenhuma tarefa com Dias Restantes igual a 0, 1, 3 ou 7 encontrada.")
+
+
+def print_whatsapp_markdown(mensagem):
+    # Remove qualquer sequência de escape \ seguida de um caractere
+    mensagem_ajustada = re.sub(r"\\(.)", r"\1", mensagem)
+    return mensagem_ajustada
+
+
+# Gera a mensagem compatível com WhatsApp
+mensagem_wpp_bc = f"```md\n{print_whatsapp_markdown(mensagem_conjunta)}```"
+
+# Envia a mensagem como texto simples
+enviar_mensagem_telegram(
+    mensagem=mensagem_wpp_bc, t_chat_id=TELEGRAM_CHAT_ID_WPP, parse_mode="Markdown"
+)
+logger.debug(f"Mensagem compatível com WhatsApp enviada!\n{mensagem_wpp_bc}")
