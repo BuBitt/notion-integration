@@ -7,7 +7,6 @@ import asyncio
 import logging
 import requests
 import polars as pl
-
 from functools import partial
 from dotenv import load_dotenv
 from rich.console import Console
@@ -15,21 +14,17 @@ from colorlog import ColoredFormatter
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-# Configurar console do Rich
+# Configurações existentes (mantidas iguais)
 console = Console()
-
-# Criar pastas se não existirem
 os.makedirs("logs", exist_ok=True)
 os.makedirs("caches", exist_ok=True)
 
-# Configurar logging com cores
+# Configuração de logging (mantida igual)
 log_filename = os.path.join(
     "logs", f"notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 console_formatter = ColoredFormatter(
     "%(log_color)s%(asctime)s | %(levelname)-8s | %(message)s%(reset)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -44,26 +39,27 @@ console_formatter = ColoredFormatter(
 file_formatter = logging.Formatter(
     "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
-
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
-
 file_handler = logging.FileHandler(log_filename)
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
-# Configurar Polars
+# Configuração do Polars (mantida igual)
 pl.Config.set_tbl_formatting("NOTHING")
 pl.Config.set_tbl_hide_column_data_types(True)
 pl.Config.set_tbl_rows(30)
 
-# Arquivos para caches persistentes
+# Arquivos de cache
 PAGE_CACHE_FILE = os.path.join("caches", "page_cache.json")
 MATERIA_CACHE_FILE = os.path.join("caches", "materia_cache.json")
+LAST_MESSAGE_FILE = os.path.join(
+    "caches", "last_message.json"
+)  # Novo arquivo para rastrear mensagens
 
 
-# Função para verificar e atualizar o cache
+# Funções de cache existentes (mantidas iguais)
 def check_and_update_cache(file_path, cache_name, max_age_days=1):
     if os.path.exists(file_path):
         mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
@@ -75,7 +71,6 @@ def check_and_update_cache(file_path, cache_name, max_age_days=1):
     return load_cache(file_path, cache_name)
 
 
-# Funções para carregar e salvar caches
 def load_cache(file_path, cache_name):
     if os.path.exists(file_path):
         try:
@@ -100,15 +95,13 @@ def save_cache(cache, file_path, cache_name):
         logger.error(f"Erro ao salvar cache {cache_name} em {file_path}: {e}")
 
 
-# Função para limpar logs antigos
+# Função para limpar logs antigos (mantida igual)
 def clean_old_logs(max_age_days=7):
     log_files = glob.glob("logs/notion_sync_*.log")
     current_time = time.time()
     for log_file in log_files:
         file_time = os.path.getmtime(log_file)
-        if (current_time - file_time) > (
-            max_age_days * 24 * 60 * 60
-        ):  # Converter dias para segundos
+        if (current_time - file_time) > (max_age_days * 24 * 60 * 60):
             try:
                 os.remove(log_file)
                 logger.info(f"Arquivo de log antigo removido: {log_file}")
@@ -116,11 +109,14 @@ def clean_old_logs(max_age_days=7):
                 logger.error(f"Erro ao remover log {log_file}: {e}")
 
 
-# Carregar caches existentes com verificação de atualização
+# Carregar caches
 page_cache = check_and_update_cache(PAGE_CACHE_FILE, "page_cache", max_age_days=1)
 materia_cache = check_and_update_cache(
     MATERIA_CACHE_FILE, "materia_cache", max_age_days=1
 )
+last_message_info = load_cache(
+    LAST_MESSAGE_FILE, "last_message"
+)  # Carregar info da última mensagem
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -130,7 +126,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
-# Função para checar a API do Notion
+# Funções existentes do Notion (mantidas iguais)
 def check_notion_api(api_key, database_id):
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -153,7 +149,6 @@ def check_notion_api(api_key, database_id):
         return False
 
 
-# Checagem inicial
 logger.info("Iniciando programa e checando API do Notion...")
 if not notion_api_key or not notion_database_id:
     logger.error(
@@ -165,8 +160,6 @@ if not check_notion_api(notion_api_key, notion_database_id):
     raise SystemExit("Erro na API do Notion")
 
 logger.info("Variáveis de ambiente carregadas e API validada com sucesso!")
-
-# Configuração da API do Notion
 headers = {
     "Authorization": f"Bearer {notion_api_key}",
     "Notion-Version": "2022-06-28",
@@ -174,7 +167,7 @@ headers = {
 }
 
 
-# Funções auxiliares
+# Funções auxiliares do Notion (mantidas iguais)
 def extract_title(props, prop_name):
     try:
         return (
@@ -310,7 +303,6 @@ logger.info("Iniciando requisição ao Notion...")
 results = fetch_notion_data(notion_database_id, headers)
 logger.info("Dados obtidos com sucesso! Processando...")
 
-# Processar em lotes
 batch_size = 50
 batches = [results[i : i + batch_size] for i in range(0, len(results), batch_size)]
 all_rows = []
@@ -320,39 +312,30 @@ with ThreadPoolExecutor(max_workers=10) as executor:
     for future in as_completed(futures):
         all_rows.extend(future.result())
 
-# Criar DataFrame
 logger.info("Criando DataFrame...")
 df = pl.DataFrame(all_rows).sort("Dias Restantes", nulls_last=True)
 logger.info("DataFrame criado com sucesso!")
 
-# Limpar logs antigos antes de prosseguir
 clean_old_logs(max_age_days=7)
-
-# Salvar caches ao final
 save_cache(page_cache, PAGE_CACHE_FILE, "page_cache")
 save_cache(materia_cache, MATERIA_CACHE_FILE, "materia_cache")
 
-# Filtrar tarefas não feitas com Dias Restantes <= 7
 df = df.filter((pl.col("Feito?") == "No") & (pl.col("Dias Restantes") <= 7))
 logger.debug(df)
 
-# Transforma o dataframe em uma lista de dicionários
 tarefas = df.to_dicts()
 
-# Verificar se as variáveis do Telegram estão definidas
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
     raise ValueError(
         "As variáveis 'TELEGRAM_BOT_TOKEN' e 'TELEGRAM_CHAT_ID' precisam estar definidas no .env!"
     )
 
 
-# Função para formatar a data de YYYY-MM-DD para DD/MM
 def formatar_data(data_str):
     data = datetime.strptime(data_str, "%Y-%m-%d")
     return data.strftime("%d/%m")
 
 
-# Função para escapar todos os caracteres reservados no MarkdownV2
 def escapar_markdown_v2(texto):
     caracteres_reservados = [
         "_",
@@ -379,7 +362,6 @@ def escapar_markdown_v2(texto):
     return texto
 
 
-# Função para gerar a mensagem de uma tarefa com MarkdownV2
 def gerar_mensagem_tarefa(tarefa):
     dias_restantes = tarefa.get("Dias Restantes")
     if dias_restantes not in [0, 1, 3, 7]:
@@ -388,24 +370,29 @@ def gerar_mensagem_tarefa(tarefa):
     tipo = tarefa.get("Tipo", "N/D").upper()
     materia = tarefa.get("Matéria", "N/D")
     entrega = tarefa.get("Entrega", "N/D")
-    descricao = tarefa.get("Descrição", "N/D") or "Sem descrição"
+    descricao = tarefa.get("Descrição") or "Sem descrição"
     data_formatada = formatar_data(entrega) if entrega != "N/D" else "N/D"
     tipo = escapar_markdown_v2(tipo)
     materia = escapar_markdown_v2(materia)
     data_formatada = escapar_markdown_v2(data_formatada)
     descricao = escapar_markdown_v2(descricao)
-    topicos = tarefa.get("Tópicos", "N/D") or "Sem Tópicos"
+    topicos = tarefa.get("Tópicos") or "Sem Tópicos"
 
-    # Separar tópicos por quebra de linha e aplicar itálico
     topicos_formatados = "\n".join(
         [
             f"\\- _{escapar_markdown_v2(topico.strip())}_"
             for topico in topicos.split(", ")
         ]
     )
+
+    if dias_restantes == 0:
+        dias_texto = "🚨 HOJE 🚨"
+    else:
+        dias_texto = f"{dias_restantes} DIA{'S' if dias_restantes > 1 else ''}"
+
     mensagem = (
         f"*{tipo} \\- {materia}*\n"
-        f"Dias Restantes: *{dias_restantes} DIA{'S' if dias_restantes > 1 else ''}*\n"
+        f"Dias Restantes: *{dias_texto}*\n"
         f"Entrega: `{data_formatada}`\n"
         f"Tópicos:\n{topicos_formatados}\n"
         f"Descrição: _{descricao}_"
@@ -413,7 +400,23 @@ def gerar_mensagem_tarefa(tarefa):
     return mensagem
 
 
-# Função para enviar mensagem ao Telegram
+# Nova função para apagar mensagem anterior
+def delete_previous_message(chat_id, message_id):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteMessage"
+    payload = {"chat_id": chat_id, "message_id": message_id}
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            logger.info(f"Mensagem anterior (ID: {message_id}) apagada com sucesso!")
+        else:
+            logger.error(
+                f"Erro ao apagar mensagem: {response.status_code} - {response.text}"
+            )
+    except requests.RequestException as e:
+        logger.error(f"Erro de conexão ao tentar apagar mensagem: {e}")
+
+
+# Função ajustada para enviar mensagem ao Telegram
 def enviar_mensagem_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -424,25 +427,42 @@ def enviar_mensagem_telegram(mensagem):
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
+            message_data = response.json()
+            message_id = message_data["result"]["message_id"]
             logger.info("Mensagem enviada ao Telegram com sucesso!")
+            return message_id  # Retorna o ID da mensagem enviada
         else:
             logger.error(
                 f"Erro ao enviar mensagem ao Telegram: {response.status_code} - {response.text}"
             )
+            return None
     except requests.RequestException as e:
         logger.error(f"Erro de conexão com o Telegram: {e}")
+        return None
 
 
-# Gerar mensagens conjuntas e enviar ao Telegram
+# Lógica para apagar mensagem anterior e enviar nova
 mensagens = [gerar_mensagem_tarefa(tarefa) for tarefa in tarefas]
 mensagens_validas = [msg for msg in mensagens if msg is not None]
 
 if mensagens_validas:
-    # Separador estilizado com emojis e texto
     separador = "\n\n*\\-\\-\\-\\-\\-\\-*\n\n"
     mensagem_conjunta = separador.join(mensagens_validas)
-    mensagem_conjunta = f"{mensagem_conjunta}"  # Cabeçalho
+    mensagem_conjunta = f"{mensagem_conjunta}"
     logger.debug(f"Mensagem a ser enviada ao Telegram:\n\n{mensagem_conjunta}\n")
-    enviar_mensagem_telegram(mensagem_conjunta)
+
+    # Verificar se há mensagem anterior no mesmo dia
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    if (
+        last_message_info.get("date") == current_date
+        and "message_id" in last_message_info
+    ):
+        delete_previous_message(TELEGRAM_CHAT_ID, last_message_info["message_id"])
+
+    # Enviar nova mensagem e salvar o message_id
+    message_id = enviar_mensagem_telegram(mensagem_conjunta)
+    if message_id:
+        last_message_info = {"message_id": message_id, "date": current_date}
+        save_cache(last_message_info, LAST_MESSAGE_FILE, "last_message")
 else:
     logger.info("Nenhuma tarefa com Dias Restantes igual a 0, 1, 3 ou 7 encontrada.")
