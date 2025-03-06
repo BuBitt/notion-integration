@@ -1,18 +1,20 @@
 import os
+import time
+import glob
 import json
-import requests
-import polars as pl
 import aiohttp
 import asyncio
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
-from rich.console import Console
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 import logging
+import requests
+import polars as pl
+
+from functools import partial
+from dotenv import load_dotenv
+from rich.console import Console
 from colorlog import ColoredFormatter
-import glob
-import time
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 # Configurar console do Rich
 console = Console()
@@ -22,16 +24,26 @@ os.makedirs("logs", exist_ok=True)
 os.makedirs("caches", exist_ok=True)
 
 # Configurar logging com cores
-log_filename = os.path.join("logs", f"notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+log_filename = os.path.join(
+    "logs", f"notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 console_formatter = ColoredFormatter(
     "%(log_color)s%(asctime)s | %(levelname)-8s | %(message)s%(reset)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    log_colors={"DEBUG": "cyan", "INFO": "green", "WARNING": "yellow", "ERROR": "red", "CRITICAL": "red,bg_white"}
+    log_colors={
+        "DEBUG": "cyan",
+        "INFO": "green",
+        "WARNING": "yellow",
+        "ERROR": "red",
+        "CRITICAL": "red,bg_white",
+    },
 )
-file_formatter = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+file_formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(console_formatter)
@@ -50,14 +62,18 @@ pl.Config.set_tbl_rows(30)
 PAGE_CACHE_FILE = os.path.join("caches", "page_cache.json")
 MATERIA_CACHE_FILE = os.path.join("caches", "materia_cache.json")
 
+
 # Função para verificar e atualizar o cache
 def check_and_update_cache(file_path, cache_name, max_age_days=1):
     if os.path.exists(file_path):
         mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
         if (datetime.now() - mod_time).days > max_age_days:
-            logger.info(f"Cache {cache_name} está desatualizado (mais de {max_age_days} dia). Limpando.")
+            logger.info(
+                f"Cache {cache_name} está desatualizado (mais de {max_age_days} dia). Limpando."
+            )
             return {}
     return load_cache(file_path, cache_name)
+
 
 # Funções para carregar e salvar caches
 def load_cache(file_path, cache_name):
@@ -65,12 +81,15 @@ def load_cache(file_path, cache_name):
         try:
             with open(file_path, "r") as f:
                 cache = json.load(f)
-                logger.info(f"Cache {cache_name} carregado de {file_path} com {len(cache)} itens")
+                logger.info(
+                    f"Cache {cache_name} carregado de {file_path} com {len(cache)} itens"
+                )
                 return cache
         except Exception as e:
             logger.error(f"Erro ao carregar cache {cache_name} de {file_path}: {e}")
             return {}
     return {}
+
 
 def save_cache(cache, file_path, cache_name):
     try:
@@ -80,22 +99,28 @@ def save_cache(cache, file_path, cache_name):
     except Exception as e:
         logger.error(f"Erro ao salvar cache {cache_name} em {file_path}: {e}")
 
+
 # Função para limpar logs antigos
 def clean_old_logs(max_age_days=7):
     log_files = glob.glob("logs/notion_sync_*.log")
     current_time = time.time()
     for log_file in log_files:
         file_time = os.path.getmtime(log_file)
-        if (current_time - file_time) > (max_age_days * 24 * 60 * 60):  # Converter dias para segundos
+        if (current_time - file_time) > (
+            max_age_days * 24 * 60 * 60
+        ):  # Converter dias para segundos
             try:
                 os.remove(log_file)
                 logger.info(f"Arquivo de log antigo removido: {log_file}")
             except Exception as e:
                 logger.error(f"Erro ao remover log {log_file}: {e}")
 
+
 # Carregar caches existentes com verificação de atualização
 page_cache = check_and_update_cache(PAGE_CACHE_FILE, "page_cache", max_age_days=1)
-materia_cache = check_and_update_cache(MATERIA_CACHE_FILE, "materia_cache", max_age_days=1)
+materia_cache = check_and_update_cache(
+    MATERIA_CACHE_FILE, "materia_cache", max_age_days=1
+)
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -104,9 +129,14 @@ notion_database_id = os.getenv("NOTION_DATABASE_ID")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+
 # Função para checar a API do Notion
 def check_notion_api(api_key, database_id):
-    headers = {"Authorization": f"Bearer {api_key}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    }
     url = f"https://api.notion.com/v1/databases/{database_id}"
     try:
         response = requests.get(url, headers=headers, timeout=5)
@@ -114,16 +144,21 @@ def check_notion_api(api_key, database_id):
             logger.info("API do Notion está funcionando corretamente.")
             return True
         else:
-            logger.error(f"Falha na checagem da API: Status {response.status_code} - {response.text}")
+            logger.error(
+                f"Falha na checagem da API: Status {response.status_code} - {response.text}"
+            )
             return False
     except requests.RequestException as e:
         logger.error(f"Erro ao conectar à API do Notion: {e}")
         return False
 
+
 # Checagem inicial
 logger.info("Iniciando programa e checando API do Notion...")
 if not notion_api_key or not notion_database_id:
-    logger.error("As variáveis de ambiente 'NOTION_API_KEY' e 'NOTION_DATABASE_ID' não estão definidas!")
+    logger.error(
+        "As variáveis de ambiente 'NOTION_API_KEY' e 'NOTION_DATABASE_ID' não estão definidas!"
+    )
     raise ValueError("Variáveis de ambiente não definidas!")
 if not check_notion_api(notion_api_key, notion_database_id):
     logger.error("Checagem da API falhou. Encerrando programa.")
@@ -132,21 +167,31 @@ if not check_notion_api(notion_api_key, notion_database_id):
 logger.info("Variáveis de ambiente carregadas e API validada com sucesso!")
 
 # Configuração da API do Notion
-headers = {"Authorization": f"Bearer {notion_api_key}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
+headers = {
+    "Authorization": f"Bearer {notion_api_key}",
+    "Notion-Version": "2022-06-28",
+    "Content-Type": "application/json",
+}
+
 
 # Funções auxiliares
 def extract_title(props, prop_name):
     try:
-        return props.get(prop_name, {}).get("title", [{}])[0].get("plain_text", "").strip()
+        return (
+            props.get(prop_name, {}).get("title", [{}])[0].get("plain_text", "").strip()
+        )
     except (IndexError, AttributeError):
         logger.debug(f"Erro ao extrair título de '{prop_name}'")
         return ""
 
+
 def extract_checkbox(props, prop_name):
     return "Yes" if props.get(prop_name, {}).get("checkbox", False) else "No"
 
+
 def extract_select(props, prop_name):
     return props.get(prop_name, {}).get("select", {}).get("name", "") or ""
+
 
 async def get_notion_page_async(session, page_id, headers):
     if page_id in page_cache:
@@ -163,6 +208,7 @@ async def get_notion_page_async(session, page_id, headers):
     except Exception as e:
         logger.warning(f"Falha ao buscar página {page_id}: {e}")
         return {}
+
 
 async def extract_relation_titles_async(props, prop_name, headers):
     relations = props.get(prop_name, {}).get("relation", [])
@@ -187,18 +233,23 @@ async def extract_relation_titles_async(props, prop_name, headers):
                     logger.debug(f"Erro ao processar relação {rel_id}: {e}")
     return ", ".join(titles) or "Nenhuma relação encontrada"
 
+
 def run_async_extract(props, prop_name, headers):
     return asyncio.run(extract_relation_titles_async(props, prop_name, headers))
+
 
 def extract_date(props, prop_name):
     value = props.get(prop_name, {}).get("date", {}).get("start", "")
     return value
 
+
 def extract_rich_text(props, prop_name):
     rich_text = props.get(prop_name, {}).get("rich_text", [])
     return rich_text[0].get("text", {}).get("content", "") if rich_text else ""
 
+
 today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+
 
 def calculate_days_remaining(entrega_date):
     if not entrega_date:
@@ -209,6 +260,7 @@ def calculate_days_remaining(entrega_date):
     except ValueError as e:
         logger.error(f"Erro ao calcular dias restantes para '{entrega_date}': {e}")
         return None
+
 
 def process_result(result, headers):
     props = result["properties"]
@@ -225,8 +277,10 @@ def process_result(result, headers):
         "Tópicos": run_async_extract(props, "Tópicos", headers),
     }
 
+
 def process_batch(batch, headers):
     return [process_result(result, headers) for result in batch]
+
 
 def fetch_notion_data(database_id, headers, page_size=100):
     url = f"https://api.notion.com/v1/databases/{database_id}/query"
@@ -250,6 +304,7 @@ def fetch_notion_data(database_id, headers, page_size=100):
             raise
     return all_results
 
+
 # Processamento principal
 logger.info("Iniciando requisição ao Notion...")
 results = fetch_notion_data(notion_database_id, headers)
@@ -257,7 +312,7 @@ logger.info("Dados obtidos com sucesso! Processando...")
 
 # Processar em lotes
 batch_size = 50
-batches = [results[i:i + batch_size] for i in range(0, len(results), batch_size)]
+batches = [results[i : i + batch_size] for i in range(0, len(results), batch_size)]
 all_rows = []
 
 with ThreadPoolExecutor(max_workers=10) as executor:
@@ -285,25 +340,50 @@ tarefas = df.to_dicts()
 
 # Verificar se as variáveis do Telegram estão definidas
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    raise ValueError("As variáveis 'TELEGRAM_BOT_TOKEN' e 'TELEGRAM_CHAT_ID' precisam estar definidas no .env!")
+    raise ValueError(
+        "As variáveis 'TELEGRAM_BOT_TOKEN' e 'TELEGRAM_CHAT_ID' precisam estar definidas no .env!"
+    )
+
 
 # Função para formatar a data de YYYY-MM-DD para DD/MM
 def formatar_data(data_str):
     data = datetime.strptime(data_str, "%Y-%m-%d")
     return data.strftime("%d/%m")
 
+
 # Função para escapar todos os caracteres reservados no MarkdownV2
 def escapar_markdown_v2(texto):
-    caracteres_reservados = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    caracteres_reservados = [
+        "_",
+        "*",
+        "[",
+        "]",
+        "(",
+        ")",
+        "~",
+        "`",
+        ">",
+        "#",
+        "+",
+        "-",
+        "=",
+        "|",
+        "{",
+        "}",
+        ".",
+        "!",
+    ]
     for char in caracteres_reservados:
         texto = texto.replace(char, f"\\{char}")
     return texto
 
+
 # Função para gerar a mensagem de uma tarefa com MarkdownV2
 def gerar_mensagem_tarefa(tarefa):
     dias_restantes = tarefa.get("Dias Restantes")
-    if dias_restantes not in [1, 3, 7]:
+    if dias_restantes not in [0, 1, 3, 7]:
         return None
+
     tipo = tarefa.get("Tipo", "N/D").upper()
     materia = tarefa.get("Matéria", "N/D")
     entrega = tarefa.get("Entrega", "N/D")
@@ -314,8 +394,14 @@ def gerar_mensagem_tarefa(tarefa):
     data_formatada = escapar_markdown_v2(data_formatada)
     descricao = escapar_markdown_v2(descricao)
     topicos = tarefa.get("Tópicos", "N/D") or "Sem Tópicos"
+
     # Separar tópicos por quebra de linha e aplicar itálico
-    topicos_formatados = "\n".join([f"\\- _{escapar_markdown_v2(topico.strip())}_" for topico in topicos.split(", ")])
+    topicos_formatados = "\n".join(
+        [
+            f"\\- _{escapar_markdown_v2(topico.strip())}_"
+            for topico in topicos.split(", ")
+        ]
+    )
     mensagem = (
         f"*{tipo} \\- {materia}*\n"
         f"Dias Restantes: *{dias_restantes} DIA{'S' if dias_restantes > 1 else ''}*\n"
@@ -325,22 +411,26 @@ def gerar_mensagem_tarefa(tarefa):
     )
     return mensagem
 
+
 # Função para enviar mensagem ao Telegram
 def enviar_mensagem_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": mensagem,
-        "parse_mode": "MarkdownV2"
+        "parse_mode": "MarkdownV2",
     }
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
             logger.info("Mensagem enviada ao Telegram com sucesso!")
         else:
-            logger.error(f"Erro ao enviar mensagem ao Telegram: {response.status_code} - {response.text}")
+            logger.error(
+                f"Erro ao enviar mensagem ao Telegram: {response.status_code} - {response.text}"
+            )
     except requests.RequestException as e:
         logger.error(f"Erro de conexão com o Telegram: {e}")
+
 
 # Gerar mensagens conjuntas e enviar ao Telegram
 mensagens = [gerar_mensagem_tarefa(tarefa) for tarefa in tarefas]
