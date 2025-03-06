@@ -334,9 +334,9 @@ save_cache(materia_cache, MATERIA_CACHE_FILE, "materia_cache")
 
 # Filtrar tarefas não feitas com Dias Restantes <= 7
 df = df.filter((pl.col("Feito?") == "No") & (pl.col("Dias Restantes") <= 7))
+logger.debug(df)
 
 # Transforma o dataframe em uma lista de dicionários
-print(df)
 tarefas = df.to_dicts()
 
 # Verificar se as variáveis do Telegram estão definidas
@@ -445,4 +445,4 @@ if mensagens_validas:
     logger.debug(f"Mensagem a ser enviada ao Telegram:\n\n{mensagem_conjunta}\n")
     enviar_mensagem_telegram(mensagem_conjunta)
 else:
-    logger.info("Nenhuma tarefa com Dias Restantes igual a 1, 3 ou 7 encontrada.")
+    logger.info("Nenhuma tarefa com Dias Restantes igual a 0, 1, 3 ou 7 encontrada.")
