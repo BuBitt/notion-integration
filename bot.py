@@ -327,9 +327,9 @@ logger.debug(df)
 
 tarefas = df.to_dicts()
 
-if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or not TELEGRAM_CHAT_ID_WPP:
     raise ValueError(
-        "As variáveis 'TELEGRAM_BOT_TOKEN' e 'TELEGRAM_CHAT_ID' precisam estar definidas no .env!"
+        "As variáveis 'TELEGRAM_BOT_TOKEN' e 'TELEGRAM_CHAT_ID' e 'TELEGRAM_CHAT_ID_WPP' precisam estar definidas no .env!"
     )
 
 
@@ -451,15 +451,15 @@ def enviar_mensagem_telegram(mensagem, t_chat_id=TELEGRAM_CHAT_ID, parse_mode=No
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            logger.info(f"Mensagem enviada ao Telegram (caht id {t_chat_id}) com sucesso!")
+            logger.info(f"Mensagem enviada ao Telegram (chat id {t_chat_id}) com sucesso!")
             return response.json()["result"]["message_id"]
         else:
             logger.error(
-                f"caht id {t_chat_id} - Erro ao enviar mensagem: {response.status_code} - {response.text}"
+                f"chat id {t_chat_id} - Erro ao enviar mensagem: {response.status_code} - {response.text}"
             )
             return None
     except requests.RequestException as e:
-        logger.error(f"caht id {t_chat_id} - Erro de conexão com o Telegram: {e}")
+        logger.error(f"chat id {t_chat_id} - Erro de conexão com o Telegram: {e}")
         return None
 
 
