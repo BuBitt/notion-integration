@@ -1,3 +1,10 @@
+name: Notion to Telegram Bot
+
+on:
+  schedule:
+    - cron: '10 10 * * *'  # Executa às 10h UTC (7h horário de Brasília)
+  workflow_dispatch:  # Permite rodar manualmente
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -13,13 +20,10 @@ jobs:
 
       - name: Instalar dependências
         run: |
+          sudo timedatectl set-timezone America/Sao_Paulo
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
-
-      - name: Ajustar fuso horário para UTC-3 (Brasília)
-        run: |
-          sudo timedatectl set-timezone America/Sao_Paulo
 
       - name: Restaurar cache de página
         id: cache-pages
