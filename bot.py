@@ -336,6 +336,7 @@ save_cache(materia_cache, MATERIA_CACHE_FILE, "materia_cache")
 df = df.filter((pl.col("Feito?") == "No") & (pl.col("Dias Restantes") <= 7))
 
 # Transforma o dataframe em uma lista de dicionários
+print(df)
 tarefas = df.to_dicts()
 
 # Verificar se as variáveis do Telegram estão definidas
