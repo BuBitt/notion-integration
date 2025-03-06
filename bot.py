@@ -451,15 +451,15 @@ def enviar_mensagem_telegram(mensagem, t_chat_id=TELEGRAM_CHAT_ID, parse_mode=No
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            logger.info("Mensagem enviada ao Telegram com sucesso!")
+            logger.info(f"Mensagem enviada ao Telegram (caht id {t_chat_id}) com sucesso!")
             return response.json()["result"]["message_id"]
         else:
             logger.error(
-                f"Erro ao enviar mensagem: {response.status_code} - {response.text}"
+                f"caht id {t_chat_id} - Erro ao enviar mensagem: {response.status_code} - {response.text}"
             )
             return None
     except requests.RequestException as e:
-        logger.error(f"Erro de conexão com o Telegram: {e}")
+        logger.error(f"caht id {t_chat_id} - Erro de conexão com o Telegram: {e}")
         return None
 
 
@@ -471,7 +471,6 @@ if mensagens_validas:
     separador = "\n\n*\\-\\-\\-\\-\\-\\-*\n\n"
     mensagem_conjunta = separador.join(mensagens_validas)
     mensagem_conjunta = f"{mensagem_conjunta}"
-    logger.debug(f"Mensagem a ser enviada ao Telegram:\n\n{mensagem_conjunta}\n")
 
     # Verificar se há mensagem anterior no mesmo dia
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -505,4 +504,4 @@ mensagem_wpp_bc = f"```md\n{print_whatsapp_markdown(mensagem_conjunta)}```"
 enviar_mensagem_telegram(
     mensagem=mensagem_wpp_bc, t_chat_id=TELEGRAM_CHAT_ID_WPP, parse_mode="Markdown"
 )
-logger.debug(f"Mensagem compatível com WhatsApp enviada!\n{mensagem_wpp_bc}")
+logger.debug(f"Mensagem compatível com WhatsApp enviada!")
