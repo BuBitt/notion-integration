@@ -387,7 +387,7 @@ def escapar_markdown_v2(texto):
 
 def gerar_mensagem_tarefa(tarefa):
     dias_restantes = tarefa.get("Dias Restantes")
-    if dias_restantes not in [0, 1, 3, 7]:
+    if dias_restantes > 7:
         return None
 
     tipo = tarefa.get("Tipo", "N/D").upper()
