@@ -13,13 +13,12 @@ from colorlog import ColoredFormatter
 from notion_client import AsyncClient
 from logging.handlers import RotatingFileHandler
 
-
-# Configurações iniciais
+# Configurações iniciais (mantidas iguais)
 console = Console()
 os.makedirs("logs", exist_ok=True)
 os.makedirs("caches", exist_ok=True)
 
-# Configuração do logger
+# Configuração do logger (mantida igual)
 log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 log_file = f"logs/notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
@@ -43,17 +42,17 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 logger.addHandler(console_handler)
 
-# Configuração do Polars
+# Configuração do Polars (mantida igual)
 pl.Config.set_tbl_formatting("NOTHING")
 pl.Config.set_tbl_hide_column_data_types(True)
 pl.Config.set_tbl_rows(30)
 
-# Arquivos de cache
+# Arquivos de cache (mantidos iguais)
 PAGE_CACHE_FILE = os.path.join("caches", "page_cache.json")
 MATERIA_CACHE_FILE = os.path.join("caches", "materia_cache.json")
 LAST_MESSAGE_FILE = os.path.join("caches", "last_message.json")
 
-# Carregar variáveis de ambiente
+# Carregar variáveis de ambiente (mantidas iguais)
 load_dotenv()
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -61,11 +60,11 @@ NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID_WPP = os.getenv("TELEGRAM_CHAT_ID_WPP")
 
-# Cliente Notion assíncrono
+# Cliente Notion assíncrono (mantido igual)
 notion = AsyncClient(auth=NOTION_API_KEY)
 
 
-# Funções utilitárias de cache
+# Funções utilitárias de cache (mantidas iguais)
 def check_and_update_cache(file_path, cache_name, max_age_days=1):
     if os.path.exists(file_path):
         mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
@@ -101,7 +100,7 @@ def save_cache(cache, file_path, cache_name):
         logger.error(f"Erro ao salvar cache {cache_name} em {file_path}: {e}")
 
 
-# Função para limpar logs antigos
+# Função para limpar logs antigos (mantida igual)
 def clean_old_logs(max_age_days=7):
     log_files = glob.glob("logs/notion_sync_*.log")
     current_time = time.time()
@@ -115,7 +114,7 @@ def clean_old_logs(max_age_days=7):
                 logger.error(f"Erro ao remover log {log_file}: {e}")
 
 
-# Funções de interação com a API do Notion
+# Funções de interação com a API do Notion (mantidas iguais)
 async def check_notion_api():
     try:
         await notion.databases.retrieve(database_id=NOTION_DATABASE_ID)
@@ -157,7 +156,7 @@ async def get_notion_page(page_id, cache):
         return {}
 
 
-# Funções de extração de dados do Notion
+# Funções de extração de dados do Notion (ajustada para "Status")
 def extract_title(props, prop_name):
     try:
         return (
@@ -166,10 +165,6 @@ def extract_title(props, prop_name):
     except (IndexError, AttributeError):
         logger.debug(f"Erro ao extrair título de '{prop_name}'")
         return ""
-
-
-def extract_checkbox(props, prop_name):
-    return "Yes" if props.get(prop_name, {}).get("checkbox", False) else "No"
 
 
 def extract_select(props, prop_name):
@@ -211,7 +206,7 @@ def extract_rich_text(props, prop_name):
     return rich_text[0].get("text", {}).get("content", "") if rich_text else ""
 
 
-# Funções de processamento de dados
+# Funções de processamento de dados (ajustada para "Status")
 today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -234,7 +229,7 @@ async def process_result(result, page_cache, materia_cache):
         )
         return {
             "Professor": "",
-            "Feito?": "No",
+            "Status": "",  # Alterado de "Feito?" para "Status"
             "Tipo": "",
             "Estágio": "",
             "Matéria": "",
@@ -246,7 +241,9 @@ async def process_result(result, page_cache, materia_cache):
     entrega_date = extract_date(props, "Data de Entrega")
     return {
         "Professor": extract_title(props, "Professor"),
-        "Feito?": extract_checkbox(props, "Feito?"),
+        "Status": extract_select(
+            props, "Status"
+        ),  # Alterado para "Status" com extract_select
         "Tipo": extract_select(props, "Tipo"),
         "Estágio": extract_select(props, "Estágio"),
         "Matéria": await extract_relation_titles(props, "Matéria", materia_cache),
@@ -262,7 +259,7 @@ async def process_batch(batch, page_cache, materia_cache):
     return await asyncio.gather(*tasks)
 
 
-# Funções de formatação de mensagem
+# Funções de formatação de mensagem (mantidas iguais)
 def formatar_data(data_str):
     meses = {
         1: "Janeiro",
@@ -352,7 +349,7 @@ def print_whatsapp_markdown(mensagem):
     return re.sub(r"\\(.)", r"\1", mensagem)
 
 
-# Funções de interação com Telegram
+# Funções de interação com Telegram (mantidas iguais)
 def delete_previous_message(chat_id, message_id):
     import requests
 
@@ -393,7 +390,7 @@ def enviar_mensagem_telegram(mensagem, t_chat_id=TELEGRAM_CHAT_ID, parse_mode=No
         return None
 
 
-# Função principal
+# Função principal (filtro ajustado)
 async def main():
     logger.info("Iniciando programa e checando API do Notion...")
     if not all([NOTION_API_KEY, NOTION_DATABASE_ID]):
@@ -429,7 +426,12 @@ async def main():
     logger.info("Criando DataFrame...")
     df = pl.DataFrame(all_rows).sort("Dias Restantes", nulls_last=True)
     logger.info("DataFrame criado com sucesso!")
-    df = df.filter((pl.col("Feito?") == "No") & (pl.col("Dias Restantes") <= 7))
+    # Filtro ajustado: exclui "Concluído" e mantém apenas tarefas de 0 a 7 dias restantes
+    df = df.filter(
+        (pl.col("Status") != "Concluído")
+        & (pl.col("Dias Restantes") <= 7)
+        & (pl.col("Dias Restantes") >= 0)
+    )
 
     # Salvar caches e limpar logs
     clean_old_logs(max_age_days=7)
@@ -470,7 +472,9 @@ async def main():
         logger.debug(print_whatsapp_markdown(mensagem_conjunta))
         logger.info("Mensagem compatível com WhatsApp enviada!")
     else:
-        logger.info("Nenhuma tarefa com Dias Restantes <= 7 encontrada.")
+        logger.info(
+            "Nenhuma tarefa com Dias Restantes entre 0 e 7 e Status diferente de 'Concluído' encontrada."
+        )
 
 
 if __name__ == "__main__":
