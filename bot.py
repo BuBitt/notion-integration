@@ -15,8 +15,12 @@ from logging.handlers import RotatingFileHandler
 
 # Configurações iniciais (mantidas iguais)
 console = Console()
-os.makedirs("logs", exist_ok=True)
-os.makedirs("caches", exist_ok=True)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logs_dir = os.path.join(current_dir, "logs")
+caches_dir = os.path.join(current_dir, "caches")
+
+os.makedirs(logs_dir, exist_ok=True)
+os.makedirs(caches_dir, exist_ok=True)
 
 # Configuração do logger (mantida igual)
 log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -390,7 +394,7 @@ def enviar_mensagem_telegram(mensagem, t_chat_id=TELEGRAM_CHAT_ID, parse_mode=No
         return None
 
 
-# Função principal (filtro ajustado)
+# Função principal
 async def main():
     logger.info("Iniciando programa e checando API do Notion...")
     if not all([NOTION_API_KEY, NOTION_DATABASE_ID]):
