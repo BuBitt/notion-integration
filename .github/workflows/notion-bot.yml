@@ -20,6 +20,17 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Restaurar cache das dependências
+        id: cache-dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            venv
+            ~/.cache/pip  # Opcional: cache do pip para downloads
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Instalar dependências
         run: |
           python -m venv venv
