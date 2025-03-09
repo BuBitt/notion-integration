@@ -13,18 +13,22 @@ from colorlog import ColoredFormatter
 from notion_client import AsyncClient
 from logging.handlers import RotatingFileHandler
 
-# Configurações iniciais (mantidas iguais)
+
+# Configurações iniciais
 console = Console()
 current_dir = os.path.dirname(os.path.abspath(__file__))
 logs_dir = os.path.join(current_dir, "logs")
 caches_dir = os.path.join(current_dir, "caches")
 
+# Criar os diretórios antes de configurar o logger
 os.makedirs(logs_dir, exist_ok=True)
 os.makedirs(caches_dir, exist_ok=True)
 
-# Configuração do logger (mantida igual)
+# Configuração do logger
+log_file = os.path.join(
+    logs_dir, f"notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+)
 log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-log_file = f"logs/notion_sync_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
 handler.setFormatter(log_formatter)
 
@@ -51,10 +55,10 @@ pl.Config.set_tbl_formatting("NOTHING")
 pl.Config.set_tbl_hide_column_data_types(True)
 pl.Config.set_tbl_rows(30)
 
-# Arquivos de cache (mantidos iguais)
-PAGE_CACHE_FILE = os.path.join("caches", "page_cache.json")
-MATERIA_CACHE_FILE = os.path.join("caches", "materia_cache.json")
-LAST_MESSAGE_FILE = os.path.join("caches", "last_message.json")
+# Arquivos de cache (atualizados para usar caminhos absolutos)
+PAGE_CACHE_FILE = os.path.join(caches_dir, "page_cache.json")
+MATERIA_CACHE_FILE = os.path.join(caches_dir, "materia_cache.json")
+LAST_MESSAGE_FILE = os.path.join(caches_dir, "last_message.json")
 
 # Carregar variáveis de ambiente (mantidas iguais)
 load_dotenv()
